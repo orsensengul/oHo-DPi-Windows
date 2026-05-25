@@ -1,13 +1,18 @@
 oHo-DPi Windows
 ================
 
-1. start.bat dosyasina cift tikla.
-2. Status ciktisinda sunlari gormeyi bekle:
+ONEMLI:
+Zip'in icinden bat dosyasi calistirma.
+Once zip'e sag tikla ve "Extract All..." / "Tumunu Ayikla" ile normal bir klasore cikar.
+
+1. Cikan klasoru ac.
+2. start.bat dosyasina cift tikla.
+3. Status ciktisinda sunlari gormeyi bekle:
    state: running
    port: reachable
    wininet-proxy-match: yes
-3. open-discord.bat ile Discord'u yeniden ac.
-4. Isin bitince stop.bat calistir.
+4. open-discord.bat ile Discord'u yeniden ac.
+5. Isin bitince stop.bat calistir.
 
 Proxy takili kalirsa reset-proxy.bat calistir.
 

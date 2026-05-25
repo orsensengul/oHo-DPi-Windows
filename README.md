@@ -5,9 +5,10 @@ Windows 11 icin Discord odakli SpoofDPI deneme paketidir. Amac, Superonline gibi
 ## En Kolay Kullanım
 
 1. GitHub Releases sayfasindan `oHo-DPi-Windows.zip` indir.
-2. Zip'i bir klasore cikar.
-3. `start.bat` dosyasina cift tikla.
-4. Status ciktisinda sunlari gormeyi bekle:
+2. Zip'e sag tikla ve `Extract All...` / `Tumunu Ayikla` ile normal bir klasore cikar.
+3. Cikan klasoru ac. Bat dosyalarini zip'in icinden calistirma.
+4. `start.bat` dosyasina cift tikla.
+5. Status ciktisinda sunlari gormeyi bekle:
 
 ```text
 state: running
@@ -15,8 +16,8 @@ port: reachable
 wininet-proxy-match: yes
 ```
 
-5. `open-discord.bat` ile Discord'u yeniden ac.
-6. Isin bitince `stop.bat` calistir.
+6. `open-discord.bat` ile Discord'u yeniden ac.
+7. Isin bitince `stop.bat` calistir.
 
 Proxy takili kalirsa `reset-proxy.bat` calistir.
 
