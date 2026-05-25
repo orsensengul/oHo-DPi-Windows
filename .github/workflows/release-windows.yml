@@ -26,6 +26,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
+          cache: false
 
       - name: Checkout SpoofDPI
         uses: actions/checkout@v4
@@ -33,6 +34,21 @@ jobs:
           repository: xvzc/spoofdpi
           ref: ${{ github.event.inputs.spoofdpi_ref || 'main' }}
           path: spoofdpi-src
+
+      - name: Patch SpoofDPI Windows socket build
+        shell: pwsh
+        run: |
+          $file = "spoofdpi-src\internal\netutil\conn.go"
+          $text = Get-Content -Raw $file
+          $patched = $text.Replace(
+            "syscall.SetsockoptInt(int(fd), level, opt, int(ttl))",
+            "syscall.SetsockoptInt(syscall.Handle(fd), level, opt, int(ttl))"
+          )
+          if ($patched -eq $text) {
+            throw "Expected socket option call was not found in $file"
+          }
+          Set-Content -NoNewline -Encoding UTF8 $file $patched
+          git -C spoofdpi-src diff -- internal/netutil/conn.go
 
       - name: Build spoofdpi.exe
         shell: pwsh
