@@ -35,6 +35,7 @@ oHo-DPi-Windows/
   start.bat
   start-aggressive.bat
   restart-aggressive.bat
+  debug-aggressive.bat
   stop.bat
   status.bat
   open-discord.bat
@@ -53,6 +54,7 @@ oHo-DPi-Windows/
 - `start.bat`: Npcap gerektirmeyen default profil ile SpoofDPI'i baslatir, WinINET proxy'yi `127.0.0.1:18080` yapar, admin ise WinHTTP proxy'yi de ayarlar.
 - `start-aggressive.bat`: Npcap / `wpcap.dll` isteyen aggressive fake-packet profilini baslatir.
 - `restart-aggressive.bat`: Aggressive profili durdurup yeniden baslatir.
+- `debug-aggressive.bat`: Aggressive profili foreground calistirir; crash/fatal ciktiyi pencerede gormek icindir.
 - `stop.bat`: SpoofDPI'i durdurur ve proxy ayarlarini geri alir.
 - `status.bat`: process, port ve proxy eslesmesini gosterir.
 - `open-discord.bat`: Discord'u proxy hazirken kapatip yeniden acar.
@@ -67,6 +69,7 @@ cd .\windows
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 status
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 start
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 start-aggressive
+powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 debug-aggressive
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 open-discord
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 stop
 ```

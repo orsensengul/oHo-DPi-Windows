@@ -156,6 +156,56 @@ jobs:
           '@
           git -C spoofdpi-src diff -- internal/packet/handle_default.go
 
+      - name: Patch SpoofDPI Windows fixed TTL sniffer
+        shell: pwsh
+        run: |
+          Set-Content -Encoding UTF8 "spoofdpi-src\internal\packet\fixed_sniffer_windows.go" @'
+          package packet
+
+          import (
+              "net"
+
+              "github.com/xvzc/spoofdpi/internal/config"
+              "github.com/xvzc/spoofdpi/internal/netutil"
+          )
+
+          var _ Sniffer = (*FixedSniffer)(nil)
+
+          type FixedSniffer struct {
+              ttl uint8
+          }
+
+          func NewFixedSniffer(cfg *config.RuntimeConfig) *FixedSniffer {
+              ttl := uint8(cfg.Conn.DefaultFakeTTL)
+              if ttl == 0 {
+                  ttl = 8
+              }
+              return &FixedSniffer{ttl: ttl}
+          }
+
+          func (s *FixedSniffer) StartCapturing() {}
+
+          func (s *FixedSniffer) Register(addrs []net.IP) {}
+
+          func (s *FixedSniffer) GetOptimalTTL(key netutil.IPKey) uint8 {
+              return s.ttl
+          }
+          '@
+
+          $file = "spoofdpi-src\cmd\spoofdpi\main.go"
+          $text = Get-Content -Raw $file
+          $text = $text.Replace(
+            "hopCache := cache.NewLRUCache[netutil.IPKey, uint8](16, 8192, nil)",
+            "hopCache := cache.NewLRUCache[netutil.IPKey, uint8](16, 8192, nil)`n`t_ = hopCache"
+          )
+          $text = $text -replace "`t`ttcpSniffer = packet\.NewTCPSniffer\(pktLogger, tcpHandle, hopCache, &cfg\.Runtime\)\r?\n`t`ttcpWriter = packet\.NewTCPWriter\(pktLogger, tcpHandle, route\)\r?\n`t`ttcpSniffer\.StartCapturing\(\)", "`t`ttcpSniffer = packet.NewFixedSniffer(&cfg.Runtime)`n`t`ttcpWriter = packet.NewTCPWriter(pktLogger, tcpHandle, route)"
+          $text = $text -replace "`t`tudpSniffer = packet\.NewUDPSniffer\(pktLogger, udpHandle, hopCache, &cfg\.Runtime\)\r?\n`t`tudpWriter = packet\.NewUDPWriter\(pktLogger, udpHandle, route\)\r?\n`t`tudpSniffer\.StartCapturing\(\)", "`t`tudpSniffer = packet.NewFixedSniffer(&cfg.Runtime)`n`t`tudpWriter = packet.NewUDPWriter(pktLogger, udpHandle, route)"
+          if ($text -notmatch "NewFixedSniffer") {
+            throw "Expected fixed sniffer patch was not applied"
+          }
+          Set-Content -NoNewline -Encoding UTF8 $file $text
+          git -C spoofdpi-src diff -- cmd/spoofdpi/main.go internal/packet/fixed_sniffer_windows.go
+
       - name: Build spoofdpi.exe
         shell: pwsh
         run: |

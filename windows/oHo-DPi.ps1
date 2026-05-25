@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("install", "start", "start-aggressive", "stop", "restart", "restart-aggressive", "status", "open-discord", "reset-proxy")]
+    [ValidateSet("install", "start", "start-aggressive", "debug-aggressive", "stop", "restart", "restart-aggressive", "status", "open-discord", "reset-proxy")]
     [string]$Action = "status"
 )
 
@@ -299,6 +299,8 @@ function Start-SpoofDpi {
             Write-Output "Switching profile from $currentProfile to $Profile"
             Stop-Process -Id $existing.Id -Force -ErrorAction SilentlyContinue
             Remove-Item -Force $PidPath -ErrorAction SilentlyContinue
+            Restore-WinInetProxy
+            Reset-WinHttpProxyIfManaged | Out-Null
             Start-Sleep -Seconds 1
         } else {
             Set-WinInetProxy
@@ -342,6 +344,9 @@ function Start-SpoofDpi {
 
     $running = Get-Process -Id $proc.Id -ErrorAction SilentlyContinue
     if (-not $running) {
+        Restore-WinInetProxy
+        Reset-WinHttpProxyIfManaged | Out-Null
+        Remove-Item -Force $PidPath -ErrorAction SilentlyContinue
         Write-Output "state: stopped"
         Write-Output "running: no"
         Write-Output "profile: $Profile"
@@ -361,6 +366,9 @@ function Start-SpoofDpi {
             Write-Output ""
             Write-Output "Npcap/WinPcap eksik gorunuyor. Default start.bat Npcap gerektirmez; aggressive mod icin Npcap gerekir."
             Write-Output "Npcap: https://npcap.com/#download"
+        } elseif ($Profile -eq "aggressive-npcap") {
+            Write-Output ""
+            Write-Output "Aggressive mod gateway sonrasi kapandiysa debug-aggressive.bat ile foreground ciktisini al."
         }
         exit 1
     }
@@ -400,6 +408,47 @@ function Reset-Proxy {
     Write-Output "winhttp: $winHttp"
 }
 
+function Debug-Aggressive {
+    $binary = Get-SpoofDpiBinary
+    if (-not $binary) {
+        Write-Output "state: not-installed"
+        Write-Output "installed: no"
+        Write-Output "spoofdpi.exe bulunamadi."
+        exit 1
+    }
+
+    Ensure-Dirs
+    Enable-NpcapPath
+    if (-not (Test-WpcapAvailable)) {
+        Write-Output "Npcap gerekiyor: wpcap.dll bulunamadi."
+        Write-Output "Npcap: https://npcap.com/#download"
+        exit 1
+    }
+
+    $existing = Get-ManagedProcess
+    if ($existing) {
+        Write-Output "Stopping existing SpoofDPI pid $($existing.Id)"
+        Stop-Process -Id $existing.Id -Force -ErrorAction SilentlyContinue
+        Remove-Item -Force $PidPath -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 1
+    }
+
+    Write-Config -Profile "aggressive-npcap"
+    Write-Output "[oHo-DPi] Foreground aggressive debug starting."
+    Write-Output "[oHo-DPi] Press Ctrl+C to stop. Proxy will be restored when this command exits."
+    Set-WinInetProxy
+    $winHttp = Set-WinHttpProxyIfAdmin
+    Write-Output "[oHo-DPi] winhttp: $winHttp"
+    try {
+        & $binary --config "$ConfigPath"
+    } finally {
+        Restore-WinInetProxy
+        Reset-WinHttpProxyIfManaged | Out-Null
+        Remove-Item -Force $PidPath -ErrorAction SilentlyContinue
+        Write-Output "[oHo-DPi] Debug session ended; proxy restored."
+    }
+}
+
 function Get-State {
     $binary = Get-SpoofDpiBinary
     $installed = if ($binary) { "yes" } else { "no" }
@@ -437,11 +486,16 @@ function Get-State {
     Write-Output "config: $ConfigPath"
     Write-Output "log: $LogPath"
     Write-Output "error-log: $ErrorLogPath"
-    if ($state -eq "degraded" -and (Test-Path $LogPath)) {
+    $runtimeMismatch = $process -eq "yes" -or $port -eq "reachable"
+    if ($state -eq "degraded" -and -not $runtimeMismatch) {
+        Write-Output "stale-proxy: yes"
+        Write-Output "Proxy ayari acik kalmis gorunuyor. Admin olarak reset-proxy.bat calistir."
+    }
+    if ($state -eq "degraded" -and $runtimeMismatch -and (Test-Path $LogPath)) {
         Write-Output "log tail:"
         Get-Content -Tail 20 $LogPath
     }
-    if ($state -eq "degraded" -and (Test-Path $ErrorLogPath)) {
+    if ($state -eq "degraded" -and $runtimeMismatch -and (Test-Path $ErrorLogPath)) {
         Write-Output "error log tail:"
         Get-Content -Tail 20 $ErrorLogPath
     }
@@ -465,6 +519,7 @@ switch ($Action) {
     "install" { Install-SpoofDpi }
     "start" { Start-SpoofDpi -Profile "default" }
     "start-aggressive" { Start-SpoofDpi -Profile "aggressive-npcap" }
+    "debug-aggressive" { Debug-Aggressive }
     "stop" { Stop-SpoofDpi }
     "restart" { Stop-SpoofDpi; Start-SpoofDpi -Profile "default" }
     "restart-aggressive" { Stop-SpoofDpi; Start-SpoofDpi -Profile "aggressive-npcap" }
