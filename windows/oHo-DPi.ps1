@@ -24,6 +24,7 @@ $WinInetBackupPath = Join-Path $RuntimeDir "wininet-proxy-backup.json"
 $WinHttpMarkerPath = Join-Path $RuntimeDir "winhttp-proxy-managed"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $TemplatePath = Join-Path $ScriptRoot "config\spoofdpi.discord.toml"
+$BundledBinary = Join-Path $ScriptRoot "bin\spoofdpi.exe"
 $VendorBinary = Join-Path $ScriptRoot "vendor\spoofdpi.exe"
 
 function Ensure-Dirs {
@@ -44,6 +45,7 @@ function Get-PathCommand {
 }
 
 function Get-SpoofDpiBinary {
+    if (Test-Path $BundledBinary) { return $BundledBinary }
     if (Test-Path $LocalBinary) { return $LocalBinary }
     if (Test-Path $VendorBinary) { return $VendorBinary }
     return Get-PathCommand "spoofdpi.exe"
@@ -200,6 +202,12 @@ function Install-SpoofDpi {
         & $LocalBinary --version 2>$null
         return
     }
+    if (Test-Path $BundledBinary) {
+        Write-Output "installed: yes"
+        Write-Output "binary: $BundledBinary"
+        & $BundledBinary --version 2>$null
+        return
+    }
     if (Test-Path $VendorBinary) {
         Copy-Item -Force $VendorBinary $LocalBinary
         Write-Output "installed: yes"
@@ -216,6 +224,7 @@ function Install-SpoofDpi {
     Write-Output "installed: no"
     Write-Output "spoofdpi.exe bulunamadi."
     Write-Output "Beklenen konumlar:"
+    Write-Output "- $BundledBinary"
     Write-Output "- $LocalBinary"
     Write-Output "- $VendorBinary"
     Write-Output "- PATH icinde spoofdpi.exe"

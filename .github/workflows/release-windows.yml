@@ -1,0 +1,64 @@
+name: Build Windows release zip
+
+on:
+  workflow_dispatch:
+    inputs:
+      spoofdpi_ref:
+        description: "xvzc/spoofdpi ref to build"
+        required: false
+        default: "main"
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout oHo-DPi-Windows
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+
+      - name: Checkout SpoofDPI
+        uses: actions/checkout@v4
+        with:
+          repository: xvzc/spoofdpi
+          ref: ${{ github.event.inputs.spoofdpi_ref || 'main' }}
+          path: spoofdpi-src
+
+      - name: Build spoofdpi.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\oHo-DPi-Windows\bin | Out-Null
+          $commit = git -C spoofdpi-src rev-parse --short HEAD
+          go build -C spoofdpi-src -ldflags "-s -w -X main.commit=$commit -X main.build=oHo-DPi-Windows" -o ..\dist\oHo-DPi-Windows\bin\spoofdpi.exe .\cmd\spoofdpi
+
+      - name: Prepare zip layout
+        shell: pwsh
+        run: |
+          Copy-Item windows\oHo-DPi.ps1 dist\oHo-DPi-Windows\oHo-DPi.ps1
+          New-Item -ItemType Directory -Force -Path dist\oHo-DPi-Windows\config | Out-Null
+          Copy-Item windows\config\spoofdpi.discord.toml dist\oHo-DPi-Windows\config\spoofdpi.discord.toml
+          Copy-Item release\*.bat dist\oHo-DPi-Windows\
+          Copy-Item release\README.txt dist\oHo-DPi-Windows\README.txt
+          Compress-Archive -Path dist\oHo-DPi-Windows -DestinationPath dist\oHo-DPi-Windows.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oHo-DPi-Windows
+          path: dist/oHo-DPi-Windows.zip
+
+      - name: Upload release asset
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/oHo-DPi-Windows.zip
