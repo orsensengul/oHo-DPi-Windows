@@ -62,7 +62,7 @@ jobs:
         run: |
           Copy-Item windows\oHo-DPi.ps1 dist\oHo-DPi-Windows\oHo-DPi.ps1
           New-Item -ItemType Directory -Force -Path dist\oHo-DPi-Windows\config | Out-Null
-          Copy-Item windows\config\spoofdpi.discord.toml dist\oHo-DPi-Windows\config\spoofdpi.discord.toml
+          Copy-Item windows\config\*.toml dist\oHo-DPi-Windows\config\
           Copy-Item release\*.bat dist\oHo-DPi-Windows\
           Copy-Item release\README.txt dist\oHo-DPi-Windows\README.txt
           Compress-Archive -Path dist\oHo-DPi-Windows -DestinationPath dist\oHo-DPi-Windows.zip -Force

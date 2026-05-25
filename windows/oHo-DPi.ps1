@@ -1,6 +1,6 @@
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("install", "start", "stop", "restart", "status", "open-discord", "reset-proxy")]
+    [ValidateSet("install", "start", "start-aggressive", "stop", "restart", "restart-aggressive", "status", "open-discord", "reset-proxy")]
     [string]$Action = "status"
 )
 
@@ -17,13 +17,15 @@ $LocalRoot = Join-Path $env:LOCALAPPDATA $AppName
 $BinDir = Join-Path $LocalRoot "bin"
 $LocalBinary = Join-Path $BinDir "spoofdpi.exe"
 $ConfigPath = Join-Path $RuntimeDir "spoofdpi.discord.toml"
+$ProfilePath = Join-Path $RuntimeDir "profile"
 $PidPath = Join-Path $RuntimeDir "spoofdpi.pid"
 $LogPath = Join-Path $RuntimeDir "spoofdpi.log"
 $ErrorLogPath = Join-Path $RuntimeDir "spoofdpi.err.log"
 $WinInetBackupPath = Join-Path $RuntimeDir "wininet-proxy-backup.json"
 $WinHttpMarkerPath = Join-Path $RuntimeDir "winhttp-proxy-managed"
 $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$TemplatePath = Join-Path $ScriptRoot "config\spoofdpi.discord.toml"
+$DefaultTemplatePath = Join-Path $ScriptRoot "config\spoofdpi.discord.toml"
+$AggressiveTemplatePath = Join-Path $ScriptRoot "config\spoofdpi.discord.aggressive-npcap.toml"
 $BundledBinary = Join-Path $ScriptRoot "bin\spoofdpi.exe"
 $VendorBinary = Join-Path $ScriptRoot "vendor\spoofdpi.exe"
 
@@ -51,12 +53,46 @@ function Get-SpoofDpiBinary {
     return Get-PathCommand "spoofdpi.exe"
 }
 
-function Write-Config {
-    Ensure-Dirs
-    if (-not (Test-Path $TemplatePath)) {
-        throw "Config template not found: $TemplatePath"
+function Get-ProfileName {
+    if (Test-Path $ProfilePath) {
+        $profile = (Get-Content -Raw $ProfilePath).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($profile)) { return $profile }
     }
-    Copy-Item -Force $TemplatePath $ConfigPath
+    return "unknown"
+}
+
+function Test-WpcapAvailable {
+    $paths = @(
+        (Join-Path $env:WINDIR "System32\wpcap.dll"),
+        (Join-Path $env:WINDIR "System32\Npcap\wpcap.dll"),
+        (Join-Path $env:WINDIR "SysWOW64\wpcap.dll")
+    )
+    foreach ($path in $paths) {
+        if (Test-Path $path) { return $true }
+    }
+    foreach ($dir in ($env:PATH -split ';')) {
+        if ([string]::IsNullOrWhiteSpace($dir)) { continue }
+        if (Test-Path (Join-Path $dir "wpcap.dll")) { return $true }
+    }
+    return $false
+}
+
+function Enable-NpcapPath {
+    $npcapDir = Join-Path $env:WINDIR "System32\Npcap"
+    if ((Test-Path (Join-Path $npcapDir "wpcap.dll")) -and -not (($env:PATH -split ';') -contains $npcapDir)) {
+        $env:PATH = "$npcapDir;$env:PATH"
+    }
+}
+
+function Write-Config {
+    param([ValidateSet("default", "aggressive-npcap")][string]$Profile = "default")
+    Ensure-Dirs
+    $template = if ($Profile -eq "aggressive-npcap") { $AggressiveTemplatePath } else { $DefaultTemplatePath }
+    if (-not (Test-Path $template)) {
+        throw "Config template not found: $template"
+    }
+    Copy-Item -Force $template $ConfigPath
+    Set-Content -Encoding ASCII $ProfilePath $Profile
 }
 
 function Get-ManagedProcess {
@@ -233,6 +269,7 @@ function Install-SpoofDpi {
 }
 
 function Start-SpoofDpi {
+    param([ValidateSet("default", "aggressive-npcap")][string]$Profile = "default")
     $binary = Get-SpoofDpiBinary
     if (-not $binary) {
         Write-Output "state: not-installed"
@@ -242,7 +279,40 @@ function Start-SpoofDpi {
     }
 
     Ensure-Dirs
-    Write-Config
+    if ($Profile -eq "aggressive-npcap") {
+        Enable-NpcapPath
+    }
+    if ($Profile -eq "aggressive-npcap" -and -not (Test-WpcapAvailable)) {
+        Write-Output "state: stopped"
+        Write-Output "running: no"
+        Write-Output "profile: aggressive-npcap"
+        Write-Output "Npcap gerekiyor: wpcap.dll bulunamadi."
+        Write-Output "Once Npcap kur veya Npcap gerektirmeyen default mod icin start.bat calistir."
+        Write-Output "Npcap: https://npcap.com/#download"
+        exit 1
+    }
+
+    $existing = Get-ManagedProcess
+    if ($existing) {
+        $currentProfile = Get-ProfileName
+        if ($currentProfile -ne $Profile) {
+            Write-Output "Switching profile from $currentProfile to $Profile"
+            Stop-Process -Id $existing.Id -Force -ErrorAction SilentlyContinue
+            Remove-Item -Force $PidPath -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+        } else {
+            Set-WinInetProxy
+            $winHttp = Set-WinHttpProxyIfAdmin
+            Write-Output "state: running"
+            Write-Output "running: yes"
+            Write-Output "profile: $(Get-ProfileName)"
+            Write-Output "pid: $($existing.Id)"
+            Write-Output "winhttp: $winHttp"
+            return
+        }
+    }
+
+    Write-Config -Profile $Profile
 
     $existing = Get-ManagedProcess
     if ($existing) {
@@ -250,6 +320,7 @@ function Start-SpoofDpi {
         $winHttp = Set-WinHttpProxyIfAdmin
         Write-Output "state: running"
         Write-Output "running: yes"
+        Write-Output "profile: $(Get-ProfileName)"
         Write-Output "pid: $($existing.Id)"
         Write-Output "winhttp: $winHttp"
         return
@@ -273,9 +344,24 @@ function Start-SpoofDpi {
     if (-not $running) {
         Write-Output "state: stopped"
         Write-Output "running: no"
+        Write-Output "profile: $Profile"
         Write-Output "SpoofDPI hemen kapandi. Log:"
-        if (Test-Path $LogPath) { Get-Content -Tail 40 $LogPath }
-        if (Test-Path $ErrorLogPath) { Get-Content -Tail 40 $ErrorLogPath }
+        $logText = ""
+        if (Test-Path $LogPath) {
+            $logTail = Get-Content -Tail 40 $LogPath
+            $logText += ($logTail -join "`n")
+            $logTail
+        }
+        if (Test-Path $ErrorLogPath) {
+            $errTail = Get-Content -Tail 40 $ErrorLogPath
+            $logText += "`n" + ($errTail -join "`n")
+            $errTail
+        }
+        if ($logText -match "wpcap\.dll|open pcap handle") {
+            Write-Output ""
+            Write-Output "Npcap/WinPcap eksik gorunuyor. Default start.bat Npcap gerektirmez; aggressive mod icin Npcap gerekir."
+            Write-Output "Npcap: https://npcap.com/#download"
+        }
         exit 1
     }
 
@@ -283,6 +369,7 @@ function Start-SpoofDpi {
     $winHttp = Set-WinHttpProxyIfAdmin
     Write-Output "state: running"
     Write-Output "running: yes"
+    Write-Output "profile: $Profile"
     Write-Output "pid: $($proc.Id)"
     Write-Output "listen: $ListenAddr"
     Write-Output "config: $ConfigPath"
@@ -297,7 +384,7 @@ function Stop-SpoofDpi {
     } else {
         Write-Output "SpoofDPI process not found."
     }
-    Remove-Item -Force $PidPath -ErrorAction SilentlyContinue
+    Remove-Item -Force $PidPath, $ProfilePath -ErrorAction SilentlyContinue
     Restore-WinInetProxy
     $winHttp = Reset-WinHttpProxyIfManaged
     Write-Output "state: stopped"
@@ -340,6 +427,7 @@ function Get-State {
         & $binary --version 2>$null
     }
     Write-Output "process: $process"
+    Write-Output "profile: $(Get-ProfileName)"
     if ($proc) { Write-Output "pid: $($proc.Id)" }
     Write-Output "listen: $ListenAddr"
     Write-Output "port: $port"
@@ -375,9 +463,11 @@ function Open-Discord {
 
 switch ($Action) {
     "install" { Install-SpoofDpi }
-    "start" { Start-SpoofDpi }
+    "start" { Start-SpoofDpi -Profile "default" }
+    "start-aggressive" { Start-SpoofDpi -Profile "aggressive-npcap" }
     "stop" { Stop-SpoofDpi }
-    "restart" { Stop-SpoofDpi; Start-SpoofDpi }
+    "restart" { Stop-SpoofDpi; Start-SpoofDpi -Profile "default" }
+    "restart-aggressive" { Stop-SpoofDpi; Start-SpoofDpi -Profile "aggressive-npcap" }
     "status" { Get-State }
     "open-discord" { Open-Discord }
     "reset-proxy" { Reset-Proxy }

@@ -7,11 +7,12 @@ Windows 11 icin Discord odakli SpoofDPI deneme paketidir. Amac, Superonline gibi
 1. GitHub Releases sayfasindan `oHo-DPi-Windows.zip` indir.
 2. Zip'e sag tikla ve `Extract All...` / `Tumunu Ayikla` ile normal bir klasore cikar.
 3. Cikan klasoru ac. Bat dosyalarini zip'in icinden calistirma.
-4. `start.bat` dosyasina cift tikla.
+4. `start.bat` dosyasina cift tikla. Bu default mod Npcap gerektirmez.
 5. Status ciktisinda sunlari gormeyi bekle:
 
 ```text
 state: running
+profile: default
 port: reachable
 wininet-proxy-match: yes
 ```
@@ -21,17 +22,26 @@ wininet-proxy-match: yes
 
 Proxy takili kalirsa `reset-proxy.bat` calistir.
 
+Discord hala acilmazsa daha guclu profil denenebilir:
+
+1. Npcap kur: <https://npcap.com/#download>
+2. `start-aggressive.bat` calistir.
+3. `open-discord.bat` ile Discord'u yeniden ac.
+
 ## Zip Icerigi
 
 ```text
 oHo-DPi-Windows/
   start.bat
+  start-aggressive.bat
+  restart-aggressive.bat
   stop.bat
   status.bat
   open-discord.bat
   reset-proxy.bat
   oHo-DPi.ps1
   config/spoofdpi.discord.toml
+  config/spoofdpi.discord.aggressive-npcap.toml
   bin/spoofdpi.exe
   README.txt
 ```
@@ -40,7 +50,9 @@ oHo-DPi-Windows/
 
 ## Bat Dosyaları
 
-- `start.bat`: SpoofDPI'i baslatir, WinINET proxy'yi `127.0.0.1:18080` yapar, admin ise WinHTTP proxy'yi de ayarlar.
+- `start.bat`: Npcap gerektirmeyen default profil ile SpoofDPI'i baslatir, WinINET proxy'yi `127.0.0.1:18080` yapar, admin ise WinHTTP proxy'yi de ayarlar.
+- `start-aggressive.bat`: Npcap / `wpcap.dll` isteyen aggressive fake-packet profilini baslatir.
+- `restart-aggressive.bat`: Aggressive profili durdurup yeniden baslatir.
 - `stop.bat`: SpoofDPI'i durdurur ve proxy ayarlarini geri alir.
 - `status.bat`: process, port ve proxy eslesmesini gosterir.
 - `open-discord.bat`: Discord'u proxy hazirken kapatip yeniden acar.
@@ -54,6 +66,7 @@ Zip disinda repo kaynaklariyla calismak istersen:
 cd .\windows
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 status
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 start
+powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 start-aggressive
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 open-discord
 powershell -ExecutionPolicy Bypass -File .\oHo-DPi.ps1 stop
 ```
@@ -71,6 +84,7 @@ PATH icinde spoofdpi.exe
 
 ```text
 %APPDATA%\oHo-DPi\spoofdpi.discord.toml
+%APPDATA%\oHo-DPi\profile
 %APPDATA%\oHo-DPi\spoofdpi.pid
 %APPDATA%\oHo-DPi\spoofdpi.log
 %APPDATA%\oHo-DPi\spoofdpi.err.log

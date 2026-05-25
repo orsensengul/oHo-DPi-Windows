@@ -12,15 +12,15 @@ qtype = "all"
 cache = true
 
 [https]
-fake-count = 0
+fake-count = 5
+fake-packet = [0x16, 0x03, 0x01]
 disorder = true
 split-mode = "chunk"
 chunk-size = 1
 
-# Superonline icin ilk temiz deneme Npcap gerektirmeyen Discord profilidir.
-# Basarisiz olursa start-aggressive.bat ile Npcap isteyen fake-packet profili denenebilir.
+# Daha guclu Discord profili. Windows'ta Npcap / wpcap.dll gerektirir.
 [[rules]]
-name = "discord default no-pcap"
+name = "discord aggressive npcap"
 priority = 100
 match.domains = [
     "discord.com",
@@ -43,4 +43,4 @@ match.domains = [
     "*.storage.googleapis.com"
 ]
 dns = { mode = "https", https-url = "https://1.1.1.1/dns-query", cache = true }
-https = { fake-count = 0, disorder = true, split-mode = "chunk", chunk-size = 1 }
+https = { fake-count = 7, fake-packet = [0x16, 0x03, 0x01], disorder = true, split-mode = "chunk", chunk-size = 1 }

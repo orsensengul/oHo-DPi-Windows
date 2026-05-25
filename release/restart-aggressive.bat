@@ -1,0 +1,18 @@
+@echo off
+setlocal
+cd /d "%~dp0"
+if not exist "%~dp0oHo-DPi.ps1" (
+  echo [oHo-DPi] oHo-DPi.ps1 bulunamadi.
+  echo [oHo-DPi] Zip dosyasinin icinden calistirma. Once zip'e sag tikla, "Extract All..." / "Tumunu Ayikla" ile klasore cikar.
+  echo [oHo-DPi] Sonra cikan klasordeki restart-aggressive.bat dosyasina cift tikla.
+  echo.
+  pause
+  exit /b 1
+)
+echo [oHo-DPi] Restarting aggressive SpoofDPI profile. Npcap / wpcap.dll is required.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0oHo-DPi.ps1" restart-aggressive
+echo.
+echo [oHo-DPi] Current status:
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0oHo-DPi.ps1" status
+echo.
+pause
