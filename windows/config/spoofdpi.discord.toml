@@ -1,0 +1,47 @@
+[app]
+mode = "http"
+listen-addr = "127.0.0.1:18080"
+log-level = "info"
+no-tui = true
+auto-configure-network = false
+
+[dns]
+mode = "https"
+https-url = "https://1.1.1.1/dns-query"
+qtype = "all"
+cache = true
+
+[https]
+fake-count = 5
+fake-packet = [0x16, 0x03, 0x01]
+disorder = true
+split-mode = "chunk"
+chunk-size = 1
+
+# Superonline icin ilk temiz deneme aggressive Discord profilidir.
+# Basarisiz olursa v2'de socks5, process-level proxy veya TUN profilleri denenebilir.
+[[rules]]
+name = "discord aggressive"
+priority = 100
+match.domains = [
+    "discord.com",
+    "*.discord.com",
+    "discord.gg",
+    "*.discord.gg",
+    "discordapp.com",
+    "*.discordapp.com",
+    "discordapp.net",
+    "*.discordapp.net",
+    "discordstatus.com",
+    "*.discordstatus.com",
+    "updates.discord.com",
+    "gateway.discord.gg",
+    "cdn.discordapp.com",
+    "media.discordapp.net",
+    "stable.dl2.discordapp.net",
+    "*.dl2.discordapp.net",
+    "discord-attachments-uploads-prd.storage.googleapis.com",
+    "*.storage.googleapis.com"
+]
+dns = { mode = "https", https-url = "https://1.1.1.1/dns-query", cache = true }
+https = { fake-count = 7, fake-packet = [0x16, 0x03, 0x01], disorder = true, split-mode = "chunk", chunk-size = 1 }
